@@ -1,11 +1,11 @@
 import os
 import json
 from fastapi import FastAPI, Request, Form, HTTPException
-from fastapi.responses import HTMLResponse, RedirectResponse
+from fastapi.responses import HTMLResponse, RedirectResponse, JSONResponse
 from fastapi.templating import Jinja2Templates
 from core import network
 
-app = FastAPI(title="Smart WoL Core Engine")
+app = FastAPI(title="Smart-WoL Core Engine")
 templates = Jinja2Templates(directory="templates")
 DB_FILE = "devices.json"
 
@@ -30,15 +30,20 @@ def save_devices(devices):
 async def dashboard(request: Request):
     global current_scan_cache
     devices = load_devices()
+    client_host = request.client.host if request.client else None
     
     processed_devices = {}
     for alias, info in devices.items():
+        if info["ip"] == client_host:
+            continue
+            
         is_online, os_family = network.check_status_with_os(info["ip"])
+        
         processed_devices[alias] = {
             "ip": info["ip"],
             "mac": info["mac"],
             "online": is_online,
-            "os": os_family if is_online else "Offline State"
+            "os": os_family
         }
         
     render_context = {
@@ -47,31 +52,32 @@ async def dashboard(request: Request):
         "scan_results": current_scan_cache,
         "current_user": SESSION_USER,
         "current_pass": SESSION_PASS,
-        "session_set": bool(SESSION_USER and SESSION_PASS),
-        "has_env_creds": bool(SESSION_USER and SESSION_PASS)
+        "session_set": bool(SESSION_USER and SESSION_PASS)
     }
     
     current_scan_cache = []
     return templates.TemplateResponse(request=request, name="index.html", context=render_context)
 
-@app.post("/api/credentials")
-async def web_set_credentials(username: str = Form(...), password: str = Form(...)):
-    global SESSION_USER, SESSION_PASS
-    SESSION_USER = username.strip()
-    SESSION_PASS = password
-    return RedirectResponse(url="/", status_code=303)
-
 @app.post("/api/scan")
-async def web_scan_network():
+async def web_scan_network(request: Request):
     global current_scan_cache
     raw_discovered = network.discover_devices() or []
+    devices = load_devices()
+    
+    tracked_macs = {info["mac"].upper() for info in devices.values()}
+    client_host = request.client.host if request.client else None
     
     current_scan_cache = []
     for dev in raw_discovered:
+        if dev["mac"] in tracked_macs or dev["ip"] == client_host or dev["ip"] == "127.0.0.1":
+            continue
+            
         _, os_family = network.check_status_with_os(dev["ip"])
+            
         current_scan_cache.append({
             "ip": dev["ip"],
-            "mac": dev["mac"].upper(),
+            "mac": dev["mac"],
+            "name": dev["name"],
             "os": os_family
         })
         
@@ -84,7 +90,6 @@ async def web_add_device(alias: str = Form(...), mac: str = Form(...), ip: str =
     target_mac = mac.upper().strip()
     target_ip = ip.strip()
     
-    # Check for tracking collisions
     for existing_alias, info in devices.items():
         if info["mac"] == target_mac:
             raise HTTPException(status_code=400, detail=f"Collision: MAC {target_mac} already tracked as '{existing_alias}'.")
@@ -117,15 +122,22 @@ async def web_wake_device(alias: str):
     raise HTTPException(status_code=404, detail="Node mismatch")
 
 @app.post("/api/sleep/{alias}")
-def web_sleep_device(alias: str, username: str = Form(None), password: str = Form(None)):
+def web_sleep_device(alias: str, username: str = Form(None), password: str = Form(None), remember: str = Form(None)):
+    global SESSION_USER, SESSION_PASS
     devices = load_devices()
     target = alias.lower()
     
-    user = username.strip() if (username and username.strip()) else SESSION_USER
-    text_pass = password if (password and password.strip()) else SESSION_PASS
+    # Check incoming inline modal tokens or pull from running application memory cache fallback
+    user = username.strip() if username else SESSION_USER
+    text_pass = password if password else SESSION_PASS
     
     if not user or not text_pass:
-        raise HTTPException(status_code=400, detail="Missing authorization tokens.")
+        raise HTTPException(status_code=400, detail="Missing credential authorization parameters.")
+
+    # 🎯 PERSISTENCE LAYER: If "remember credentials" was toggled, store them globally in application memory
+    if remember == "true" and username and password:
+        SESSION_USER = username.strip()
+        SESSION_PASS = password
 
     if target in devices:
         device = devices[target]
@@ -138,7 +150,6 @@ def web_sleep_device(alias: str, username: str = Form(None), password: str = For
         
         try:
             import winrm
-            # FIXED PARAMETERS: Matching our successful CLI test script configuration
             session = winrm.Session(
                 device["ip"], 
                 auth=(user, text_pass), 
@@ -148,11 +159,10 @@ def web_sleep_device(alias: str, username: str = Form(None), password: str = For
             )
             session.run_ps(sleep_payload)
         except Exception as e:
-            # Catching the read timeout because it means the computer successfully went to sleep!
             if "timeout" in str(e).lower():
                 pass 
             else:
-                raise HTTPException(status_code=500, detail=f"Execution error: {str(e)}")
+                raise HTTPException(status_code=500, detail=f"WinRM Execution error: {str(e)}")
                 
         return RedirectResponse(url="/", status_code=303)
     raise HTTPException(status_code=404, detail="Target node mismatch")
