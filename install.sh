@@ -1,12 +1,13 @@
 #!/bin/bash
 
-# Pi-WoL Premium Autopilot Installation Engine
+# Pi-WoL Premium Autopilot Installation Engine (Universal Version)
 COLOR_RED='\033[0;31m'
 COLOR_GREEN='\033[0;32m'
 COLOR_BLUE='\033[0;34m'
 COLOR_YELLOW='\033[0;33m'
 COLOR_RESET='\033[0m'
 
+# 🛑 CRITICAL ROOT PRIVILEGE CHECK
 if [ "$EUID" -ne 0 ]; then
     echo -e "${COLOR_RED}  [✗] Error: Privileged environment context required.${COLOR_RESET}"
     echo -e "      Please run the installation script using: ${COLOR_BLUE}sudo bash${COLOR_RESET}"
@@ -22,6 +23,7 @@ echo -e "${COLOR_RED}      |    | | |__| |__| |___ ${COLOR_RESET}"
 echo -e "${COLOR_BLUE}=========================================${COLOR_RESET}"
 echo -e "       Pi-WoL Premium Autopilot Installer   \n"
 
+# Detect the actual non-root user who invoked sudo to ensure dynamic path resolution
 REAL_USER=${SUDO_USER:-$(whoami)}
 REAL_HOME=$(eval echo ~$REAL_USER)
 
@@ -74,9 +76,14 @@ run_with_spinner "Initializing local data profile registries" \
 run_with_spinner "Injecting hardware kernel cache access permissions" \
     "SUDOERS_RULE=\"$REAL_USER ALL=(ALL) NOPASSWD: /usr/sbin/ip neigh flush *\" && if ! grep -qF \"\$SUDOERS_RULE\" /etc/sudoers; then echo \"\$SUDOERS_RULE\" | tee -a /etc/sudoers; fi"
 
-# --- STEP 5: AUTOMATE BACKGROUND PROCESSES ---
-run_with_spinner "Building and enabling background system daemon wrapper" \
-    "sudo tee /etc/systemd/system/piwol.service > /dev/null <<EOF
+# --- STEP 5: AUTOMATE BACKGROUND PROCESSES (DYNAMICALLY MAPPED) ---
+run_with_spinner "Building and enabling background system daemon wrapper" "
+UVICORN_PATH=\$(sudo -u $REAL_USER which uvicorn)
+if [ -z \"\$UVICORN_PATH\" ]; then
+    UVICORN_PATH=\"$REAL_HOME/.local/bin/uvicorn\"
+fi
+
+sudo tee /etc/systemd/system/piwol.service > /dev/null <<EOF
 [Unit]
 Description=Pi-WoL Network Appliance Dashboard
 After=network.target
@@ -84,14 +91,19 @@ After=network.target
 [Service]
 User=$REAL_USER
 WorkingDirectory=$REAL_HOME/Pi-WoL
-ExecStart=/usr/local/bin/uvicorn app:app --host 0.0.0.0 --port 8000
+Environment=\"PATH=$REAL_HOME/.local/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin\"
+ExecStart=\$UVICORN_PATH app:app --host 0.0.0.0 --port 8000
 Restart=always
 RestartSec=5
 
 [Install]
 WantedBy=multi-user.target
 EOF
-systemctl daemon-reload && systemctl enable piwol.service"
+
+echo \"$REAL_USER ALL=(ALL) NOPASSWD: /usr/bin/systemctl restart piwol.service, /usr/bin/systemctl enable piwol.service\" | tee -a /etc/sudoers > /dev/null
+
+systemctl daemon-reload && systemctl enable piwol.service
+"
 
 # --- STEP 6: CREATE ACCESSIBILITY GLOBAL SHORTCUT (pi-wol) ---
 run_with_spinner "Writing global terminal CLI access utility mapping rules" "sudo tee /usr/local/bin/pi-wol > /dev/null <<'EOF'
@@ -99,14 +111,14 @@ run_with_spinner "Writing global terminal CLI access utility mapping rules" "sud
 COLOR_BLUE='\033[0;34m'
 COLOR_GREEN='\033[0;32m'
 COLOR_RESET='\033[0m'
-echo -e \"${COLOR_BLUE}=== Pi-WoL Command Line Utility ===${COLOR_RESET}\"
+echo -e \"\n${COLOR_BLUE}=== Pi-WoL Command Line Utility ===${COLOR_RESET}\"
 echo -e \"Status: \$(systemctl is-active piwol.service)\"
 echo -e \"Local Dashboard Link: ${COLOR_GREEN}http://\$(hostname -I | awk '{print \$1}'):8000${COLOR_RESET}\"
-echo -e \"Commands: \n  sudo systemctl restart piwol  - Restart Dashboard \n  sudo systemctl stop piwol     - Halt Web Server Console\n\"
+echo -e \"Commands: \n  sudo systemctl restart piwol.service  - Restart Dashboard \n  sudo systemctl stop piwol.service     - Halt Web Server Console\n\"
 EOF
 sudo chmod +x /usr/local/bin/pi-wol"
 
-# --- STEP 7: IGNITION TRACE MAPS ---
+# --- STEP 7: IGNITION ---
 run_with_spinner "Starting application routing engine" \
     "systemctl restart piwol.service"
 
