@@ -1,0 +1,200 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>⚡ Smart WoL Dashboard</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+</head>
+<body class="bg-slate-900 text-slate-100 min-h-screen font-sans">
+
+    <div class="max-w-6xl mx-auto px-4 py-8">
+        <header class="flex flex-col md:flex-row justify-between items-center border-b border-slate-800 pb-6 mb-8 gap-4">
+            <div class="flex items-center gap-3">
+                <div class="bg-amber-500 text-slate-950 p-3 rounded-xl shadow-lg shadow-amber-500/20">
+                    <i class="fa-solid fa-bolt text-2xl"></i>
+                </div>
+                <div>
+                    <h1 class="text-2xl font-bold tracking-tight">Smart WoL Console</h1>
+                    <p class="text-sm text-slate-400">Local Hardware & Power Management Hub</p>
+                </div>
+            </div>
+            
+            <div class="flex flex-wrap gap-3 items-center">
+                <button onclick="document.getElementById('credDrawer').classList.toggle('hidden')" class="bg-slate-800 hover:bg-slate-700 border border-slate-700 px-3.5 py-2.5 rounded-lg text-sm font-semibold transition flex items-center gap-2">
+                    <i class="fa-solid fa-key text-blue-400"></i> Set Credentials
+                </button>
+                <form action="/api/scan" method="post" class="m-0">
+                    <button type="submit" class="bg-slate-800 hover:bg-slate-700 border border-slate-700 px-4 py-2.5 rounded-lg text-sm font-semibold transition flex items-center gap-2">
+                        <i class="fa-solid fa-radar fa-pulse text-amber-400"></i> Scan Network
+                    </button>
+                </form>
+                <button onclick="document.getElementById('addModal').classList.toggle('hidden')" class="bg-blue-600 hover:bg-blue-500 px-4 py-2.5 rounded-lg text-sm font-semibold transition flex items-center gap-2 shadow-lg">
+                    <i class="fa-solid fa-plus"></i> Add Device
+                </button>
+            </div>
+        </header>
+
+        <section class="mb-8 bg-gradient-to-r from-slate-800 to-slate-800/40 border border-slate-700/60 rounded-2xl p-6">
+            <h3 class="text-white text-base font-bold flex items-center gap-2 mb-2"><i class="fa-solid fa-map-signs text-amber-400"></i> Deployment Guide Manual</h3>
+            <p class="text-xs text-slate-400 mb-4">Optimized for universal deployment across standard subnet boundaries and smart mesh networks (like TP-Link Deco).</p>
+            <div class="grid grid-cols-1 md:grid-cols-3 gap-4 text-xs">
+                <div class="p-3 rounded-xl {% if not devices and not scan_results %}bg-amber-500/10 border border-amber-500/30 text-amber-200{% else %}bg-slate-900/40 border border-slate-800 text-slate-400{% endif %}">
+                    <span class="font-bold block mb-1 text-sm">Step 1: Discover Nodes</span>
+                    Tap <b class="text-slate-200">Scan Network</b>. Mesh environments will discover all live targets across both wired and wireless bands.
+                </div>
+                <div class="p-3 rounded-xl {% if scan_results %}bg-amber-500/10 border border-amber-500/30 text-amber-200{% else %}bg-slate-900/40 border border-slate-800 text-slate-400{% endif %}">
+                    <span class="font-bold block mb-1 text-sm">Step 2: Save Target Inventory</span>
+                    Look through the temporary discovery table and click <b class="text-slate-200">Import Node</b> *only* for the specific wired systems you wish to control.
+                </div>
+                <div class="p-3 rounded-xl {% if devices and not session_set %}bg-amber-500/10 border border-amber-500/30 text-amber-200{% else %}bg-slate-900/40 border border-slate-800 text-slate-400{% endif %}">
+                    <span class="font-bold block mb-1 text-sm">Step 3: Enable Single-Click Control</span>
+                    Open the <b class="text-slate-200">Set Credentials</b> drawer, type your target host account credentials once, and enjoy streamlined one-touch power actions!
+                </div>
+            </div>
+        </section>
+
+        <section id="credDrawer" class="{% if session_set %}hidden{% endif %} mb-8 bg-slate-800/80 border border-blue-500/30 rounded-2xl p-5 shadow-xl">
+            <div class="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
+                <div>
+                    <h3 class="text-white font-bold text-sm flex items-center gap-2"><i class="fa-solid fa-shield-halved text-blue-400"></i> Global Windows Authentication Token</h3>
+                    <p class="text-xs text-slate-400 mt-0.5">Enter the credentials your Pi will use to authenticate WinRM sleep commands across your network.</p>
+                </div>
+                <form action="/api/credentials" method="post" class="w-full md:w-auto flex flex-col sm:flex-row gap-3 items-stretch m-0">
+                    <input type="text" name="username" value="{{ current_user }}" placeholder="Windows Username" class="bg-slate-900 border border-slate-700 rounded-lg px-3 py-2 text-sm text-white placeholder-slate-500 focus:outline-none" required>
+                    <input type="password" name="password" value="{{ current_pass }}" placeholder="Windows Password" class="bg-slate-900 border border-slate-700 rounded-lg px-3 py-2 text-sm text-white placeholder-slate-500 focus:outline-none" required>
+                    <button type="submit" class="bg-blue-600 hover:bg-blue-500 font-semibold px-4 py-2 rounded-lg text-sm text-white transition whitespace-nowrap">
+                        Save Session
+                    </button>
+                </form>
+            </div>
+        </section>
+
+        {% if scan_results %}
+        <section class="mb-10 bg-slate-800/40 border border-blue-500/20 rounded-xl p-5">
+            <h2 class="text-blue-400 font-bold text-sm uppercase tracking-wider mb-3 flex items-center gap-2">
+                <i class="fa-solid fa-circle-nodes"></i> Unmapped Subnet Entities Detected
+            </h2>
+            <div class="overflow-x-auto">
+                <table class="w-full text-left text-sm text-slate-300">
+                    <thead>
+                        <tr class="border-b border-slate-700 text-slate-400 text-xs">
+                            <th class="py-2">IP MAPPING</th>
+                            <th class="py-2">MAC ADDRESS FRAME</th>
+                            <th class="py-2">DETECTED PLATFORM ARCHITECTURE</th>
+                            <th class="py-2 text-right">ACTION VECTOR</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for dev in scan_results %}
+                        <tr class="border-b border-slate-800/50 hover:bg-slate-800/30 font-mono text-xs">
+                            <td class="py-3 text-blue-400 font-semibold">{{ dev.ip }}</td>
+                            <td class="py-3 text-slate-400">{{ dev.mac }}</td>
+                            <td class="py-3">
+                                <span class="bg-slate-900 border border-slate-700 px-2 py-0.5 rounded text-slate-300 font-sans text-[10px] font-semibold">
+                                    <i class="fa-solid {% if 'Windows' in dev.os %}fa-windows text-blue-400{% else %}fa-terminal text-emerald-400{% endif %} mr-1"></i> {{ dev.os }}
+                                </span>
+                            </td>
+                            <td class="py-3 text-right">
+                                <button onclick="populateAddForm('{{ dev.ip }}', '{{ dev.mac }}')" class="bg-slate-700 hover:bg-slate-600 px-2.5 py-1.5 rounded font-sans font-medium text-white transition">
+                                    Import Node
+                                </button>
+                            </td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </section>
+        {% endif %}
+
+        <main class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+            {% if not devices %}
+            <div class="col-span-full bg-slate-800/30 border border-slate-800 rounded-2xl p-12 text-center text-slate-400">
+                <i class="fa-solid fa-server text-4xl mb-4 text-slate-600"></i>
+                <p class="font-medium">No tracked devices found in inventory.</p>
+                <p class="text-sm text-slate-500 mt-1">Scan the local network or add details manually.</p>
+            </div>
+            {% else %}
+                {% for alias, info in devices.items() %}
+                <div class="bg-slate-800/60 border border-slate-800 hover:border-slate-700 rounded-2xl p-6 shadow-xl flex flex-col justify-between">
+                    <div>
+                        <div class="flex justify-between items-start mb-4">
+                            <div>
+                                <h3 class="text-lg font-bold text-white capitalize font-mono tracking-tight">{{ alias }}</h3>
+                                <div class="flex items-center gap-1.5 mt-1">
+                                    <span class="h-2.5 w-2.5 rounded-full {% if info.online %}bg-emerald-500 shadow-lg shadow-emerald-500/40{% else %}bg-rose-500{% endif %}"></span>
+                                    <span class="text-xs font-semibold uppercase tracking-wider {% if info.online %}text-emerald-400{% else %}text-rose-400{% endif %}">
+                                        {{ info.os }}
+                                    </span>
+                                </div>
+                            </div>
+                            <form action="/api/delete/{{ alias }}" method="post" onsubmit="return confirm('Remove tracking profile?');" class="m-0">
+                                <button type="submit" class="text-slate-500 hover:text-rose-400 transition p-1.5"><i class="fa-solid fa-trash-can text-sm"></i></button>
+                            </form>
+                        </div>
+
+                        <div class="space-y-2 bg-slate-900/50 p-3 rounded-xl border border-slate-800/80 mb-6 text-xs font-mono">
+                            <div class="flex justify-between"><span class="text-slate-500">IP ADDRESS</span> <span class="text-slate-300 font-semibold">{{ info.ip }}</span></div>
+                            <div class="flex justify-between"><span class="text-slate-500">MAC BOUND</span> <span class="text-slate-300 font-semibold">{{ info.mac }}</span></div>
+                        </div>
+                    </div>
+
+                    <div>
+                        {% if info.online %}
+                        <form action="/api/sleep/{{ alias }}" method="post" class="space-y-2 m-0">
+                            {% if not has_env_creds %}
+                            <input type="text" name="username" placeholder="Windows Username" class="w-full bg-slate-900 border border-slate-700 rounded-lg px-3 py-2 text-xs font-mono text-white placeholder-slate-500 focus:outline-none focus:border-blue-500 transition" required>
+                            <input type="password" name="password" placeholder="Windows Password" class="w-full bg-slate-900 border border-slate-700 rounded-lg px-3 py-2 text-xs font-mono text-white placeholder-slate-500 focus:outline-none focus:border-blue-500 transition" required>
+                            {% endif %}
+                            <button type="submit" class="w-full bg-blue-600 hover:bg-blue-500 text-white font-bold py-2.5 px-4 rounded-xl text-sm transition shadow-lg shadow-blue-600/10 flex items-center justify-center gap-2">
+                                <i class="fa-solid fa-moon"></i> Trigger Standby Sleep
+                            </button>
+                        </form>
+                        {% else %}
+                        <a href="/api/wake/{{ alias }}" class="w-full bg-emerald-600 hover:bg-emerald-500 text-white font-bold py-2.5 px-4 rounded-xl text-sm transition text-center shadow-lg shadow-emerald-600/10 flex items-center justify-center gap-2">
+                            <i class="fa-solid fa-power-off text-xs"></i> Broadcast Wake Signal
+                        </a>
+                        {% endif %}
+                    </div>
+                </div>
+                {% endfor %}
+            {% endif %}
+        </main>
+    </div>
+
+    <div id="addModal" class="hidden fixed inset-0 bg-slate-950/80 backdrop-blur-sm flex items-center justify-center p-4 z-50">
+        <div class="bg-slate-800 border border-slate-700 rounded-2xl max-w-md w-full p-6 relative shadow-2xl">
+            <button onclick="document.getElementById('addModal').classList.add('hidden')" class="absolute top-4 right-4 text-slate-400 hover:text-white"><i class="fa-solid fa-xmark text-lg"></i></button>
+            <h3 class="text-xl font-bold mb-4 text-white flex items-center gap-2"><i class="fa-solid fa-microchip text-blue-400"></i> Track Target Node</h3>
+            <form action="/api/add" method="post" class="space-y-4 m-0">
+                <div>
+                    <label class="block text-xs font-bold uppercase tracking-wider text-slate-400 mb-1">Target Name Alias</label>
+                    <input type="text" name="alias" id="modal_alias" placeholder="e.g. desktop, laptop, server" class="w-full bg-slate-900 border border-slate-700 rounded-lg px-3 py-2 text-sm text-white placeholder-slate-500 focus:outline-none focus:border-blue-500" required>
+                </div>
+                <div>
+                    <label class="block text-xs font-bold uppercase tracking-wider text-slate-400 mb-1">MAC Address Layer</label>
+                    <input type="text" name="mac" id="modal_mac" placeholder="00:11:22:33:44:55" class="w-full bg-slate-900 border border-slate-700 rounded-lg px-3 py-2 text-sm text-white placeholder-slate-500 focus:outline-none focus:border-blue-500 font-mono" required>
+                </div>
+                <div>
+                    <label class="block text-xs font-bold uppercase tracking-wider text-slate-400 mb-1">Local Network IP</label>
+                    <input type="text" name="ip" id="modal_ip" placeholder="192.168.1.50" class="w-full bg-slate-900 border border-slate-700 rounded-lg px-3 py-2 text-sm text-white placeholder-slate-500 focus:outline-none focus:border-blue-500 font-mono" required>
+                </div>
+                <button type="submit" class="w-full bg-blue-600 hover:bg-blue-500 text-white font-bold py-2.5 rounded-xl text-sm transition mt-2 shadow-lg">
+                    Commit Tracking Configuration
+                </button>
+            </form>
+        </div>
+    </div>
+
+    <script>
+        function populateAddForm(ip, mac) {
+            document.getElementById('modal_ip').value = ip;
+            document.getElementById('modal_mac').value = mac;
+            document.getElementById('modal_alias').value = '';
+            document.getElementById('addModal').classList.remove('hidden');
+        }
+    </script>
+</body>
+</html>
