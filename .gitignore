@@ -1,0 +1,6 @@
+# Protect private home network data
+devices.json
+__pycache__/
+core/__pycache__/
+*.pyc
+.DS_Store
