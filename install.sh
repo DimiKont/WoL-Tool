@@ -59,16 +59,13 @@ run_with_spinner "Synchronizing Linux core repository indices" \
 run_with_spinner "Installing foundational tooling system packages (git, pip3)" \
     "apt-get install -y git python3-pip iproute2 coreutils"
 
-
 # --- STEP 2: CLONE CODE TREE FROM YOUR REPO ---
 run_with_spinner "Cloning official Pi-WoL codebase repository from GitHub" \
     "cd $REAL_HOME && if [ -d 'Pi-WoL' ]; then rm -rf Pi-WoL; fi && sudo -u $REAL_USER git clone https://github.com/DimiKont/Pi-WoL.git"
 
-
 # --- STEP 3: PIP MANIFEST AUTOMATION ---
 run_with_spinner "Deploying runtime frameworks from pinned requirements.txt" \
     "cd $REAL_HOME/Pi-WoL && pip3 install -r requirements.txt --break-system-packages"
-
 
 # --- STEP 4: PRIVILEGES & DATA ARTIFACTS ---
 run_with_spinner "Initializing local data profile registries" \
@@ -76,7 +73,6 @@ run_with_spinner "Initializing local data profile registries" \
 
 run_with_spinner "Injecting hardware kernel cache access permissions" \
     "SUDOERS_RULE=\"$REAL_USER ALL=(ALL) NOPASSWD: /usr/sbin/ip neigh flush *\" && if ! grep -qF \"\$SUDOERS_RULE\" /etc/sudoers; then echo \"\$SUDOERS_RULE\" | tee -a /etc/sudoers; fi"
-
 
 # --- STEP 5: AUTOMATE BACKGROUND PROCESSES ---
 run_with_spinner "Building and enabling background system daemon wrapper" \
@@ -97,22 +93,22 @@ WantedBy=multi-user.target
 EOF
 systemctl daemon-reload && systemctl enable piwol.service"
 
-
 # --- STEP 6: CREATE ACCESSIBILITY GLOBAL SHORTCUT (pi-wol) ---
-run_with_spinner "Writing global terminal CLI access utility mapping rules" "sudo tee /usr/local/bin/pi-wol > /dev/null <<EOF
+run_with_spinner "Writing global terminal CLI access utility mapping rules" "sudo tee /usr/local/bin/pi-wol > /dev/null <<'EOF'
 #!/bin/bash
+COLOR_BLUE='\033[0;34m'
+COLOR_GREEN='\033[0;32m'
+COLOR_RESET='\033[0m'
 echo -e \"${COLOR_BLUE}=== Pi-WoL Command Line Utility ===${COLOR_RESET}\"
-echo -e \"Status: \\$(systemctl is-active piwol.service)\"
-echo -e \"Local Dashboard Link: ${COLOR_GREEN}http://\\$(hostname -I | awk '{print \\\$1}'):8000${COLOR_RESET}\"
+echo -e \"Status: \$(systemctl is-active piwol.service)\"
+echo -e \"Local Dashboard Link: ${COLOR_GREEN}http://\$(hostname -I | awk '{print \$1}'):8000${COLOR_RESET}\"
 echo -e \"Commands: \n  sudo systemctl restart piwol  - Restart Dashboard \n  sudo systemctl stop piwol     - Halt Web Server Console\n\"
 EOF
 sudo chmod +x /usr/local/bin/pi-wol"
 
-
 # --- STEP 7: IGNITION TRACE MAPS ---
 run_with_spinner "Starting application routing engine" \
     "systemctl restart piwol.service"
-
 
 # --- INTERACTIVE END POST-INSTALL CHOICE MATRIX ---
 PI_IP=$(hostname -I | awk '{print $1}')
@@ -128,7 +124,7 @@ echo "  2) Exit setup and return to standard command prompt"
 echo -ne "\nSelect option (1-2): "
 read -r choice
 
-if [ "$choice" -eq 1 ]; then
+if [ "$choice" = "1" ]; then
     /usr/local/bin/pi-wol
 else
     echo -e "\nEnjoy your new console! Type ${COLOR_BLUE}pi-wol${COLOR_RESET} anytime in the future to read status updates.\n"
