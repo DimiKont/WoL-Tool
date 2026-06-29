@@ -23,7 +23,9 @@ run_with_spinner() {
     local pid=$!
     local spinner=( '/' '-' '\\' '|' )
     
-    tput civvis
+    # 🕵️‍♂️ HIDE CURSOR: Replaced "tput civvis" with a universal ANSI sequence
+    echo -ne "\033[?25l"
+    
     while kill -0 $pid 2>/dev/null; do
         for icon in "${spinner[@]}"; do
             echo -ne "\r  [${COLOR_BLUE}${icon}${COLOR_RESET}] ${message}..."
@@ -32,7 +34,9 @@ run_with_spinner() {
     done
     wait $pid
     local return_status=$?
-    tput cnorm
+    
+    # 👁️ RESTORE CURSOR: Replaced "tput cnorm" with a universal ANSI sequence
+    echo -ne "\033[?25h"
     
     if [ $return_status -eq 0 ]; then
         echo -e "\r  [${COLOR_GREEN}✓${COLOR_RESET}] ${message}"
