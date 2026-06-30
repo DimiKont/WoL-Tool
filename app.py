@@ -1,145 +1,140 @@
 import os
 import json
 from fastapi import FastAPI, Request, Form, BackgroundTasks
-from fastapi.responses import HTMLResponse, RedirectResponse, JSONResponse
+from fastapi.responses import HTMLResponse, RedirectResponse
 from fastapi.templating import Jinja2Templates
 from core import network
 
 app = FastAPI(title="Pi-WoL Core Console")
 templates = Jinja2Templates(directory="templates")
 DB_FILE = "devices.json"
-AUTH_FILE = "auth.json"
 
-def load_devices():
+def load_hardware_nodes():
     if not os.path.exists(DB_FILE): return {}
     try:
         with open(DB_FILE, "r") as f: return json.load(f)
     except: return {}
 
-def save_devices(devices):
-    with open(DB_FILE, "w") as f: json.dump(devices, f, indent=4)
-
-def get_console_password():
-    if not os.path.exists(AUTH_FILE):
-        return ""
-    try:
-        with open(AUTH_FILE, "r") as f:
-            return json.load(f).get("admin_password", "")
-    except:
-        return ""
-
-def is_authenticated(request: Request):
-    secret = get_console_password()
-    if not secret: 
-        return True
-    return request.cookies.get("piwol_session") == "authenticated"
+def save_hardware_nodes(nodes):
+    with open(DB_FILE, "w") as f: json.dump(nodes, f, indent=4)
 
 @app.get("/", response_class=HTMLResponse)
 async def dashboard(request: Request):
-    if not is_authenticated(request):
-        return templates.TemplateResponse(request=request, name="index.html", context={
-            "request": request, "auth_required": True, "error": False
-        })
-
-    devices = load_devices()
-    client_host = request.client.host if request.client else None
-    processed_devices = {}
+    nodes = load_hardware_nodes()
+    processed_nodes = {}
     
-    for alias, info in devices.items():
-        if info["ip"] == client_host: continue
-        is_online = network.check_status_with_os(info["ip"])
-        os_platform = info.get("os_type", "windows").lower()
-        processed_devices[alias] = {
-            "ip": info["ip"], "mac": info["mac"], "online": is_online,
-            "os_type": os_platform, "os_label": "Windows OS" if os_platform == "windows" else "Linux (SSH)"
+    for mac_key, node_info in nodes.items():
+        profiles_list = []
+        hardware_is_online = False
+        active_os_detected = "offline"
+        
+        checked_ips = set()
+        for p_id, p_info in node_info.get("profiles", {}).items():
+            ip_target = p_info["ip"]
+            
+            if ip_target not in checked_ips:
+                live_status = network.check_status_with_os(ip_target)
+                checked_ips.add(ip_target)
+                if live_status != "offline":
+                    hardware_is_online = True
+                    active_os_detected = live_status
+            
+            profiles_list.append({
+                "id": p_id,
+                "alias": p_info["alias"],
+                "ip": ip_target,
+                "os_type": p_info["os_type"],
+                "os_label": p_info["os_type"].upper()
+            })
+            
+        overall_state = "online" if hardware_is_online else "offline"
+
+        processed_nodes[mac_key] = {
+            "hardware_name": node_info.get("hardware_name", "Multi-Boot Client"),
+            "mac": node_info["mac"],
+            "state": overall_state,
+            "active_os": active_os_detected,
+            "profiles": profiles_list
         }
         
     return templates.TemplateResponse(request=request, name="index.html", context={
-        "request": request, "devices": processed_devices, "auth_required": False
+        "request": request, "nodes": processed_nodes
     })
 
-@app.post("/login")
-async def login(password: str = Form(...)):
-    if password == get_console_password():
-        response = RedirectResponse(url="/", status_code=303)
-        response.set_cookie(key="piwol_session", value="authenticated", max_age=86400, httponly=True)
-        return response
-    return templates.TemplateResponse(name="index.html", context={
-        "request": {}, "auth_required": True, "error": True
-    })
-
-@app.get("/logout")
-async def logout():
-    response = RedirectResponse(url="/", status_code=303)
-    response.delete_cookie("piwol_session")
-    return response
+@app.get("/api/lookup/{ip}")
+async def dynamic_mac_lookup(ip: str):
+    found_mac = network.resolve_ip_to_mac(ip.strip())
+    if found_mac:
+        return {"success": True, "mac": found_mac}
+    return {"success": False, "error": "Unreachable"}
 
 @app.post("/api/add")
 async def web_add_device(
-    request: Request,
     alias: str = Form(...), mac: str = Form(...), ip: str = Form(...),
-    os_type: str = Form(...), ssh_user: str = Form(None),
-    is_dual_boot: str = Form(None),
-    dual_alias: str = Form(None), dual_ip: str = Form(None),
-    dual_os_type: str = Form(None), dual_ssh_user: str = Form(None)
+    os_type: str = Form(...)
 ):
-    if not is_authenticated(request): return JSONResponse(status_code=401, content={"error": "Unauthorized"})
-    
-    devices = load_devices()
+    nodes = load_hardware_nodes()
     clean_mac = mac.upper().strip().replace("-", ":")
+    clean_ip = ip.strip()
+    clean_os = os_type.lower().strip()
     
-    primary_alias = alias.lower().strip()
-    devices[primary_alias] = {
-        "ip": ip.strip(), "mac": clean_mac,
-        "os_type": os_type.lower().strip(), "ssh_user": ssh_user.strip() if ssh_user else ""
-    }
+    profile_unique_id = f"{clean_os}_{alias.lower().replace(' ', '_')}"
     
-    if is_dual_boot == "true" and dual_alias and dual_ip:
-        secondary_alias = dual_alias.lower().strip()
-        devices[secondary_alias] = {
-            "ip": dual_ip.strip(), "mac": clean_mac,
-            "os_type": dual_os_type.lower().strip(), "ssh_user": dual_ssh_user.strip() if dual_ssh_user else ""
+    if clean_mac not in nodes:
+        nodes[clean_mac] = {
+            "hardware_name": f"{alias.capitalize()} Rig",
+            "mac": clean_mac,
+            "profiles": {}
         }
         
-    save_devices(devices)
-    return RedirectResponse(url="/", status_code=303)
-
-@app.post("/api/delete/{alias}")
-async def web_delete_device(alias: str, request: Request):
-    if not is_authenticated(request): return JSONResponse(status_code=401, content={"error": "Unauthorized"})
-    devices = load_devices()
-    if alias.lower() in devices:
-        del devices[alias.lower()]
-        save_devices(devices)
-    return RedirectResponse(url="/", status_code=303)
-
-@app.post("/api/wake/{alias}")
-async def web_wake_device(alias: str, request: Request):
-    if not is_authenticated(request): return JSONResponse(status_code=401, content={"error": "Unauthorized"})
-    devices = load_devices()
-    target = alias.lower()
-    if target in devices:
-        network.send_wol_packet(devices[target]["mac"])
-    return RedirectResponse(url="/", status_code=303)
-
-@app.post("/api/sleep/{alias}")
-async def web_sleep_device(alias: str, bg_tasks: BackgroundTasks, request: Request, username: str = Form(None), password: str = Form(None)):
-    if not is_authenticated(request): return JSONResponse(status_code=401, content={"error": "Unauthorized"})
-    devices = load_devices()
-    target = alias.lower()
-    if target not in devices: return RedirectResponse(url="/", status_code=303)
+    nodes[clean_mac]["profiles"][profile_unique_id] = {
+        "alias": alias.strip(),
+        "ip": clean_ip,
+        "os_type": clean_os
+    }
     
-    device_info = devices[target]
-    if device_info.get("os_type") == "linux":
-        bg_tasks.add_task(network.execute_linux_ssh_sleep, device_info["ip"], device_info.get("ssh_user", "root"))
+    save_hardware_nodes(nodes)
+    return RedirectResponse(url="/", status_code=303)
+
+@app.post("/api/delete/{mac}/{profile_id}")
+async def web_delete_profile(mac: str, profile_id: str):
+    nodes = load_hardware_nodes()
+    mac_key = mac.upper()
+    if mac_key in nodes:
+        if profile_id in nodes[mac_key]["profiles"]:
+            del nodes[mac_key]["profiles"][profile_id]
+        if not nodes[mac_key]["profiles"]:
+            del nodes[mac_key]
+        save_hardware_nodes(nodes)
+    return RedirectResponse(url="/", status_code=303)
+
+@app.post("/api/wake/{mac}")
+async def web_wake_device(mac: str):
+    network.send_wol_packet(mac.upper())
+    return RedirectResponse(url="/", status_code=303)
+
+def run_winrm_safe(ip, username, password, command_payload):
+    try:
+        import winrm
+        session = winrm.Session(ip, auth=(username, password), transport='ntlm', read_timeout_sec=6, operation_timeout_sec=5)
+        session.run_cmd(command_payload) # Running raw command executions
+        print(f"[WINDOWS POWER SUCCESS]: Execution completed for {ip}")
+    except Exception as winrm_err:
+        print(f"[WINDOWS POWER CONTROL ERROR]: Could not communicate via WinRM to {ip}. Details: {winrm_err}")
+
+@app.post("/api/power/{action}/{ip}/{os_type}")
+async def web_power_action(action: str, ip: str, os_type: str, bg_tasks: BackgroundTasks, username: str = Form(...), password: str = Form(...)):
+    if os_type != "windows":
+        bg_tasks.add_task(network.execute_linux_power_action, ip, username.strip(), password, action)
         return RedirectResponse(url="/", status_code=303)
         
     if username and password:
-        sleep_payload = '$rundll = "[DllImport(\"powrprof.dll\")] public static extern bool SetSuspendState(bool hiber, bool force, bool disable);"; $type = Add-Type -MemberDefinition $rundll -Name "Win32Power" -Namespace "Win32" -PassThru; $type::SetSuspendState($false, $false, $false)'
-        try:
-            import winrm
-            session = winrm.Session(device_info["ip"], auth=(username, password), transport='ntlm')
-            bg_tasks.add_task(session.run_ps, sleep_payload)
-        except: pass
+        # 🎯 Clean native commands that explicitly support headless shell contexts
+        if action == "sleep":
+            payload = "rundll32.exe powrprof.dll,SetSuspendState 0,1,0"
+        else:
+            payload = "shutdown.exe /s /f /t 0"
+            
+        bg_tasks.add_task(run_winrm_safe, ip, username.strip(), password, payload)
         
     return RedirectResponse(url="/", status_code=303)

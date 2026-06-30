@@ -2,39 +2,44 @@ import subprocess
 import re
 import socket
 
-def check_status_with_os(ip_address):
-    """SELF-CLEANING PASSIVE LOOKUP:
-    Fires a rapid check packet. If the target machine fails to respond,
-    the engine automatically flushes the local Linux kernel's ghost ARP entry
-    to ensure the dashboard state drops to Offline instantly.
-    """
+def check_status_with_os(ip_address, username="tsomis"):
     try:
-        # 1. Fire a fast confirmation ping (1 packet, 0.3 second timeout maximum)
         ping_check = subprocess.run(
             ["ping", "-c", "1", "-W", "1", ip_address], 
-            stdout=subprocess.DEVNULL, 
-            stderr=subprocess.DEVNULL
+            stdout=subprocess.PIPE, 
+            stderr=subprocess.PIPE,
+            text=True
         )
-        
-        # 2. If the machine didn't answer, it's either sleeping or turned off
         if ping_check.returncode != 0:
-            # Programmatically flush the ghost ARP entry from the Pi's kernel table
             subprocess.run(["sudo", "ip", "neigh", "flush", "to", ip_address], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
-            return False
+            return "offline"
 
-        # 3. Double check the system table state to confirm visibility
-        output = subprocess.check_output(["arp", "-n", ip_address], text=True)
-        if ip_address in output and "incomplete" not in output.lower():
-            return True
+        raw_output = ping_check.stdout
+        ttl_match = re.search(r"ttl=(\d+)", raw_output, re.IGNORECASE)
+        if not ttl_match:
+            return "offline"
             
+        detected_ttl = int(ttl_match.group(1))
+        if detected_ttl > 64:
+            return "windows"
+
+        ssh_command = [
+            "ssh", "-o", "StrictHostKeyChecking=no", "-o", "UserKnownHostsFile=/dev/null",
+            "-o", "NumberOfPasswordPrompts=0", "-o", "ConnectTimeout=1",
+            f"{username}@{ip_address}", "cat /etc/os-release"
+        ]
+        ssh_query = subprocess.run(ssh_command, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
+        
+        if ssh_query.returncode == 0:
+            os_info = ssh_query.stdout.lower()
+            for distro in ['ubuntu', 'arch', 'debian', 'fedora', 'mint', 'pop', 'manjaro', 'kali']:
+                if distro in os_info:
+                    return distro
+        return "linux"
     except:
-        pass
-    return False
+        return "offline"
 
 def resolve_ip_to_mac(ip_address):
-    """PASSIVE ARP TABLE LOOKUP:
-    Scrapes the Pi's internal neighbor table cache matrix.
-    """
     try:
         subprocess.run(["ping", "-c", "1", "-W", "1", ip_address], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
         output = subprocess.check_output(["arp", "-n", ip_address], text=True)
@@ -46,9 +51,6 @@ def resolve_ip_to_mac(ip_address):
     return None
 
 def send_wol_packet(mac_address):
-    """DISPATCH WAKE SIGNAL:
-    Broadcasts a rigid 102-byte Magic Packet frame over UDP Port 9.
-    """
     try:
         clean_mac = mac_address.replace(":", "").replace("-", "")
         if len(clean_mac) != 12:
@@ -61,10 +63,20 @@ def send_wol_packet(mac_address):
     except:
         return False
 
-def execute_linux_ssh_sleep(ip_address, username):
-    ssh_command = ["ssh", "-o", "StrictHostKeyChecking=no", f"{username}@{ip_address}", "sudo systemctl suspend"]
+def execute_linux_power_action(ip_address, username, password, action):
+    """
+    Handles granular execution routes for unix platforms.
+    """
+    target_cmd = "systemctl suspend" if action == "sleep" else "poweroff"
+    strict_flags = (
+        "-o StrictHostKeyChecking=no "
+        "-o UserKnownHostsFile=/dev/null "
+        "-o NumberOfPasswordPrompts=1 "
+        "-o ConnectTimeout=4"
+    )
+    full_cmd = f"sshpass -p '{password}' ssh {strict_flags} {username}@{ip_address} 'echo \"{password}\" | sudo -S {target_cmd}'"
     try:
-        subprocess.Popen(ssh_command, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+        subprocess.Popen(full_cmd, shell=True, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
         return True
     except:
         return False
