@@ -2,9 +2,7 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>PiWol Console</title>
-    <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23f04444' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'><path d='M18 16a3 3 0 0 0-3-3H9a3 3 0 0 0-3 3M8 2h8v4H8zM12 6v7M6 16h12v4a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2z'/></svg>">
+    <title>Pi-WoL Console</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <style>
@@ -13,89 +11,113 @@
         .pi-dark { background-color: #0b0d10; border-color: #1c222a; }
         .pi-border { border-color: #222933; }
         .pi-text-muted { color: #8a99ad; }
-        .pi-accent { color: #f04444; }
-        .pi-btn-blue { background-color: #2463eb; }
-        .pi-btn-blue:hover { background-color: #3b71f3; }
         .pi-btn-emerald { background-color: #107c41; }
-        .pi-btn-emerald:hover { background-color: #13914c; }
     </style>
 </head>
-<body class="text-slate-200 min-h-screen font-sans antialiased text-sm selection:bg-blue-500/30 selection:text-blue-200">
+<body class="text-slate-200 min-h-screen font-sans antialiased text-sm">
+    <div class="h-1 w-full bg-gradient-to-r from-red-500 to-blue-600"></div>
 
-    <div class="h-1 w-full bg-gradient-to-r from-red-500 via-orange-500 to-blue-600"></div>
-
-    <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-        
-        <div class="mb-8 bg-amber-500/5 border border-amber-500/20 rounded-xl p-3 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 text-xs pi-text-muted">
-            <div class="flex items-center gap-2.5">
-                <i class="fa-solid fa-circle-exclamation text-amber-500 text-sm"></i>
-                <span>Ensure your target computers have <b>Wake-on-LAN</b> enabled inside their hardware BIOS/UEFI settings before adding profiles.</span>
+    {% if auth_required %}
+    <div class="min-h-screen flex flex-col items-center justify-center p-4">
+        <div class="pi-panel border rounded-2xl p-8 max-w-sm w-full shadow-2xl text-center space-y-6">
+            <div class="text-[#f04444] text-4xl"><i class="fa-solid fa-shield-halved"></i></div>
+            <div>
+                <h1 class="text-xl font-black text-white">Pi-WoL Console</h1>
+                <p class="text-xs pi-text-muted mt-1">Console administrative access is restricted.</p>
             </div>
+            <form action="/login" method="post" class="space-y-4">
+                <input type="password" name="password" placeholder="Console Secret Token" class="w-full pi-dark border rounded-xl px-4 py-3 text-white text-center focus:outline-none" required>
+                {% if error %}
+                    <p class="text-rose-400 text-xs font-bold">Invalid authentication signature.</p>
+                {% endif %}
+                <button type="submit" class="w-full bg-blue-600 hover:bg-blue-700 text-white font-bold py-3 rounded-xl uppercase tracking-wider text-xs transition shadow-md">Authenticate</button>
+            </form>
+        </div>
+    </div>
+    {% else %}
+
+    <div class="max-w-7xl mx-auto px-4 py-8">
+        <div class="flex justify-between items-center mb-8 bg-[#161a1f] p-4 rounded-xl border border-[#222933]">
+            <div class="flex items-center gap-3">
+                <span class="text-[#f04444] text-xl"><i class="fa-solid fa-power-off"></i></span>
+                <span class="font-bold text-white text-base font-mono">Pi-WoL Management Hub</span>
+            </div>
+            <a href="/logout" class="text-slate-400 hover:text-rose-400 font-bold text-xs uppercase tracking-wide">Lock Console <i class="fa-solid fa-lock ml-1"></i></a>
         </div>
 
-        <div class="grid grid-cols-1 lg:grid-cols-12 gap-8 items-start">
-            
+        <div class="grid grid-cols-1 lg:grid-cols-12 gap-8">
             <div class="lg:col-span-5 space-y-6">
-                
-                <div class="pi-panel border rounded-2xl p-6 shadow-xl flex items-center gap-4">
-                    <div class="bg-transparent border-2 border-[#f04444] text-[#f04444] p-3 rounded-xl shadow-md flex items-center justify-center shrink-0">
-                        <svg class="w-6 h-6" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
-                            <path stroke-linecap="round" stroke-linejoin="round" d="M18 16a3 3 0 0 0-3-3H9a3 3 0 0 0-3 3M8 2h8v4H8zM12 6v7M6 16h12v4a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2z"/>
-                        </svg>
-                    </div>
-                    <div>
-                        <h1 class="text-xl font-black tracking-tight text-white leading-none">PiWoL Managing Dashboard</h1>
-                        <p class="text-[11px] font-bold tracking-widest uppercase pi-text-muted mt-1.5">Network Core Console</p>
-                    </div>
-                </div>
-
                 <div class="pi-panel border rounded-2xl p-6 shadow-xl space-y-5">
-                    <div>
-                        <h2 class="text-sm font-black text-white flex items-center gap-2">
-                            <i class="fa-solid fa-square-plus text-blue-500"></i> Register New Node
-                        </h2>
-                        <p class="text-xs pi-text-muted mt-1">Add devices manually. Type the target's IP address and click the detector link to resolve its hardware address automatically.</p>
-                    </div>
-                    
-                    <form id="nodeRegistrationForm" action="/api/add" method="post" onsubmit="validateNodeForm(event);" class="space-y-4 m-0" novalidate>
-                        <div>
-                            <label class="block text-[11px] font-black uppercase tracking-wider pi-text-muted mb-1.5">Custom Alias Handle</label>
-                            <input type="text" id="form_alias_field" name="alias" placeholder="e.g. main-desktop" class="w-full pi-dark border rounded-xl px-3.5 py-2.5 text-sm text-white focus:outline-none focus:border-blue-500/50 transition placeholder:text-slate-600">
-                        </div>
-
-                        <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                    <h2 class="text-white font-black text-sm uppercase tracking-wide"><i class="fa-solid fa-square-plus text-blue-500 mr-2"></i>Register Core Nodes</h2>
+                    <form id="nodeRegistrationForm" action="/api/add" method="post" class="space-y-4 m-0">
+                        
+                        <div class="p-4 pi-dark border rounded-xl space-y-3 shadow-inner">
+                            <span class="text-[10px] font-bold text-blue-400 uppercase tracking-widest block">Shared L2 MAC Properties</span>
                             <div>
-                                <label class="block text-[11px] font-black uppercase tracking-wider pi-text-muted mb-1.5">Platform OS</label>
-                                <select id="form_os_select" name="os_type" onchange="toggleSSHUserField(this.value)" class="w-full pi-dark border rounded-xl px-3.5 py-2.5 text-sm text-white focus:outline-none focus:border-blue-500/50 transition">
-                                    <option value="windows" selected>Windows OS</option>
-                                    <option value="linux">Linux Distribution</option>
-                                </select>
+                                <label class="block text-[11px] font-black uppercase pi-text-muted mb-1">Hardware MAC Address</label>
+                                <input type="text" name="mac" placeholder="AA:BB:CC:DD:EE:FF" class="w-full pi-dark border rounded-xl px-3.5 py-2 text-white focus:outline-none font-mono" required>
                             </div>
-                            <div id="sshUserFieldContainer" class="pointer-events-none opacity-40 transition duration-150">
-                                <label class="block text-[11px] font-black uppercase tracking-wider pi-text-muted mb-1.5">SSH User</label>
-                                <input type="text" name="ssh_user" id="modal_ssh_user" placeholder="e.g. root" class="w-full pi-dark border rounded-xl px-3.5 py-2.5 text-sm text-white font-mono focus:outline-none focus:border-blue-500/50 transition placeholder:text-slate-600">
+                            <label class="flex items-center gap-2 cursor-pointer mt-2 text-xs text-slate-300 font-bold">
+                                <input type="checkbox" id="dual_boot_toggle" name="is_dual_boot" value="true" onchange="toggleDualBootInterface()" class="rounded bg-slate-900 border-slate-700">
+                                <span>💡 This entity runs a Dual-Boot OS config</span>
+                            </label>
+                        </div>
+
+                        <div class="p-4 bg-slate-900/40 border border-dashed border-slate-800 rounded-xl space-y-3">
+                            <span id="profile1_label" class="text-[10px] font-bold text-slate-500 uppercase tracking-widest block">Primary Node Profile Configuration</span>
+                            <div class="grid grid-cols-2 gap-3">
+                                <div>
+                                    <label class="block text-[11px] font-black uppercase pi-text-muted mb-1">Handle Alias</label>
+                                    <input type="text" name="alias" placeholder="desktop-win" class="w-full pi-dark border rounded-xl px-3 py-2 text-white focus:outline-none" required>
+                                </div>
+                                <div>
+                                    <label class="block text-[11px] font-black uppercase pi-text-muted mb-1">Target Static IP</label>
+                                    <input type="text" name="ip" placeholder="192.168.68.X" class="w-full pi-dark border rounded-xl px-3 py-2 text-white focus:outline-none" required>
+                                </div>
+                            </div>
+                            <div class="grid grid-cols-2 gap-3">
+                                <div>
+                                    <label class="block text-[11px] font-black uppercase pi-text-muted mb-1">Platform OS</label>
+                                    <select name="os_type" class="w-full pi-dark border rounded-xl px-3 py-2 text-white focus:outline-none">
+                                        <option value="windows" selected>Windows OS</option>
+                                        <option value="linux">Linux OS</option>
+                                    </select>
+                                </div>
+                                <div>
+                                    <label class="block text-[11px] font-black uppercase pi-text-muted mb-1">SSH User (Linux)</label>
+                                    <input type="text" name="ssh_user" placeholder="e.g. root" class="w-full pi-dark border rounded-xl px-3 py-2 text-white focus:outline-none">
+                                </div>
                             </div>
                         </div>
 
-                        <div>
-                            <div class="flex justify-between items-center mb-1.5">
-                                <label class="block text-[11px] font-black uppercase tracking-wider pi-text-muted">Static Subnet IP</label>
-                                <button type="button" onclick="triggerAutoMacLookup()" class="text-blue-400 hover:text-blue-300 font-bold text-[10px] uppercase tracking-wide flex items-center gap-1 transition">
-                                    <i class="fa-solid fa-wand-magic-sparkles text-[9px]"></i> Auto-Detect MAC
-                                </button>
+                        <div id="dual_boot_container" class="hidden p-4 bg-blue-950/10 border border-dashed border-blue-900/40 rounded-xl space-y-3">
+                            <span class="text-[10px] font-bold text-amber-500 uppercase tracking-widest block">Secondary Node Profile Configuration</span>
+                            <div class="grid grid-cols-2 gap-3">
+                                <div>
+                                    <label class="block text-[11px] font-black uppercase pi-text-muted mb-1">Handle Alias</label>
+                                    <input type="text" name="dual_alias" placeholder="desktop-linux" class="w-full pi-dark border rounded-xl px-3 py-2 text-white focus:outline-none">
+                                </div>
+                                <div>
+                                    <label class="block text-[11px] font-black uppercase pi-text-muted mb-1">Target Static IP</label>
+                                    <input type="text" name="dual_ip" placeholder="192.168.68.X" class="w-full pi-dark border rounded-xl px-3 py-2 text-white focus:outline-none">
+                                </div>
                             </div>
-                            <input type="text" id="form_ip_field" name="ip" placeholder="e.g. 192.168.68.20" class="w-full pi-dark border rounded-xl px-3.5 py-2.5 text-sm text-white font-mono focus:outline-none focus:border-blue-500/50 transition placeholder:text-slate-600">
+                            <div class="grid grid-cols-2 gap-3">
+                                <div>
+                                    <label class="block text-[11px] font-black uppercase pi-text-muted mb-1">Platform OS</label>
+                                    <select name="dual_os_type" class="w-full pi-dark border rounded-xl px-3 py-2 text-white focus:outline-none">
+                                        <option value="windows">Windows OS</option>
+                                        <option value="linux" selected>Linux OS</option>
+                                    </select>
+                                </div>
+                                <div>
+                                    <label class="block text-[11px] font-black uppercase pi-text-muted mb-1">SSH User (Linux)</label>
+                                    <input type="text" name="dual_ssh_user" placeholder="e.g. root" class="w-full pi-dark border rounded-xl px-3 py-2 text-white focus:outline-none">
+                                </div>
+                            </div>
                         </div>
 
-                        <div>
-                            <label class="block text-[11px] font-black uppercase tracking-wider pi-text-muted mb-1.5">Hardware MAC Address</label>
-                            <input type="text" id="form_mac_field" name="mac" placeholder="e.g. 00:11:22:33:44:55" class="w-full pi-dark border rounded-xl px-3.5 py-2.5 text-sm text-white font-mono focus:outline-none focus:border-blue-500/50 transition placeholder:text-slate-600">
-                            <span id="lookupStatusLabel" class="text-[10px] block mt-1.5 leading-normal"></span>
-                        </div>
-
-                        <button type="submit" class="w-full pi-btn-blue text-white font-bold py-3 px-4 rounded-xl text-xs tracking-wider uppercase transition shadow-lg flex items-center justify-center gap-2">
-                            <i class="fa-solid fa-plus-desktop"></i> Commit Device to Disk
-                        </button>
+                        <button type="submit" class="w-full bg-blue-600 hover:bg-blue-700 text-white font-bold py-3 rounded-xl uppercase text-xs tracking-wider shadow-lg">Commit Node Entries</button>
                     </form>
                 </div>
             </div>
@@ -103,73 +125,51 @@
             <div class="lg:col-span-7">
                 <div class="pi-panel border rounded-2xl p-6 shadow-xl min-h-[510px]">
                     <div class="flex justify-between items-center mb-6 border-b pi-border pb-4">
-                        <h2 class="text-xs font-black uppercase tracking-widest pi-text-muted flex items-center gap-2">
-                            <i class="fa-solid fa-server text-slate-500"></i>Saved devices
-                        </h2>
-                        <button onclick="window.location.reload();" class="text-blue-400 hover:text-blue-300 font-bold tracking-wider text-[10px] uppercase transition flex items-center gap-1">
-                            <i class="fa-solid fa-arrow-rotate-right text-[9px]"></i> Sync States
-                        </button>
+                        <h2 class="text-xs font-black uppercase pi-text-muted">Environment Infrastructure Inventory</h2>
+                        <button onclick="window.location.reload();" class="text-blue-400 font-bold text-[10px] uppercase">Sync Array States</button>
                     </div>
-                    
-                    <div class="grid grid-cols-1 md:grid-cols-2 gap-6" id="inventory-grid">
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
                         {% if not devices %}
-                        <div class="col-span-full py-24 text-center">
-                            <div class="w-16 h-16 pi-dark border text-slate-700 rounded-2xl flex items-center justify-center mx-auto mb-4 text-2xl shadow-inner">
-                                <i class="fa-solid fa-cubes"></i>
-                            </div>
-                            <h3 class="text-white font-black text-base">No Node Records Registered</h3>
-                            <p class="text-xs pi-text-muted mt-2 max-w-sm mx-auto leading-relaxed">
-                                Your persistent tracker file is completely clear. Map your machine components using the form controller on the left side menu framework.
-                            </p>
-                        </div>
+                        <div class="col-span-full py-24 text-center"><h3 class="text-slate-500 font-black">No Active Node Records Mapped</h3></div>
                         {% else %}
                             {% for alias, info in devices.items() %}
-                            <div class="pi-dark border hover:border-[#313c4a] rounded-2xl p-5 shadow-lg flex flex-col justify-between transition duration-200 group" data-alias="{{ alias }}">
+                            <div class="pi-dark border rounded-2xl p-5 shadow-lg flex flex-col justify-between">
                                 <div>
-                                    <div class="flex justify-between items-start mb-4">
+                                    <div class="flex justify-between items-start mb-3">
                                         <div>
-                                            <h3 class="text-base font-black text-white capitalize tracking-tight font-mono group-hover:text-blue-400 transition">{{ alias }}</h3>
-                                            <div class="flex items-center gap-2 mt-2">
+                                            <h3 class="text-base font-black text-white capitalize font-mono">{{ alias }}</h3>
+                                            <div class="flex items-center gap-2 mt-1.5">
                                                 {% if info.online %}
-                                                    <span class="h-2.5 w-2.5 rounded-full bg-emerald-500 shadow-md shadow-emerald-500/50"></span>
-                                                    <span class="text-[11px] font-black uppercase tracking-widest text-emerald-400 flex items-center gap-1">
-                                                        Online (<i class="fa-solid {% if info.os_type == 'windows' %}fa-windows text-blue-400{% else %}fa-terminal text-emerald-400{% endif %} text-[10px]"></i> {{ info.os_label }})
-                                                    </span>
+                                                    <span class="h-2.5 w-2.5 rounded-full bg-emerald-500 shadow-emerald-500/50 shadow-md"></span>
+                                                    <span class="text-[11px] font-bold uppercase text-emerald-400">Online ({{ info.os_label }})</span>
                                                 {% else %}
-                                                    <span class="h-2.5 w-2.5 rounded-full bg-[#f04444] shadow-md shadow-red-500/40"></span>
-                                                    <span class="text-[11px] font-black uppercase tracking-widest text-[#f04444]">Offline Profile</span>
+                                                    <span class="h-2.5 w-2.5 rounded-full bg-slate-700"></span>
+                                                    <span class="text-[11px] font-bold uppercase text-slate-500">Node Standby State</span>
                                                 {% endif %}
                                             </div>
                                         </div>
-                                        
-                                        <form action="/api/delete/{{ alias }}" method="post" onsubmit="return confirm('Purge tracked workstation parameters completely from storage?');" class="m-0">
-                                            <button type="submit" class="text-slate-600 hover:text-[#f04444] transition p-2 rounded-xl hover:bg-slate-900/50 border border-transparent hover:border-slate-800">
-                                                <i class="fa-solid fa-trash-can text-xs"></i>
-                                            </button>
+                                        <form action="/api/delete/{{ alias }}" method="post" onsubmit="return confirm('Purge machine endpoint record?');">
+                                            <button type="submit" class="text-slate-600 hover:text-rose-500 transition"><i class="fa-solid fa-trash-can"></i></button>
                                         </form>
                                     </div>
-
-                                    <div class="space-y-2.5 pi-panel p-4 rounded-xl border mb-5 text-xs font-mono shadow-inner">
-                                        <div class="flex justify-between items-center">
-                                            <span class="text-[10px] font-bold uppercase tracking-wider text-slate-500">IP Address</span> 
-                                            <span class="text-slate-200 font-bold tracking-tight">{{ info.ip }}</span>
-                                        </div>
-                                        <div class="flex justify-between items-center border-t border-slate-800/40 pt-2">
-                                            <span class="text-[10px] font-bold uppercase tracking-wider text-slate-500">MAC Address</span> 
-                                            <span class="text-slate-400 font-medium tracking-wide text-[11px]">{{ info.mac }}</span>
-                                        </div>
+                                    <div class="space-y-1.5 pi-panel p-3.5 rounded-xl border mb-4 text-xs font-mono">
+                                        <div class="flex justify-between"><span>IP Target</span><span class="text-slate-300 font-bold">{{ info.ip }}</span></div>
+                                        <div class="flex justify-between border-t border-slate-800/60 pt-1.5"><span>MAC Layer</span><span class="text-slate-500">{{ info.mac }}</span></div>
                                     </div>
                                 </div>
-
-                                <div class="action-tray">
+                                <div>
                                     {% if info.online %}
-                                        <button type="button" onclick="interceptSleepTrigger('{{ alias }}', '{{ info.os_type }}')" class="w-full bg-blue-600/10 hover:bg-blue-600 text-blue-400 hover:text-white border border-blue-500/20 hover:border-transparent font-bold py-3 px-4 rounded-xl text-xs tracking-wider uppercase transition duration-150 shadow-md flex items-center justify-center gap-2">
-                                            <i class="fa-solid fa-moon"></i> Standby Sleep Trigger
-                                        </button>
+                                        {% if info.os_type == 'linux' %}
+                                            <form action="/api/sleep/{{ alias }}" method="post">
+                                                <button type="submit" class="w-full bg-blue-600/10 hover:bg-blue-600 text-blue-400 hover:text-white border border-blue-500/20 font-bold py-2.5 rounded-xl text-xs uppercase transition"><i class="fa-solid fa-moon mr-1"></i> Standby Sleep Trigger</button>
+                                            </form>
+                                        {% else %}
+                                            <button type="button" onclick="openWindowsSleepModal('{{ alias }}')" class="w-full bg-blue-600/10 hover:bg-blue-600 text-blue-400 hover:text-white border border-blue-500/20 font-bold py-2.5 rounded-xl text-xs uppercase transition"><i class="fa-solid fa-moon mr-1"></i> Standby Sleep Trigger</button>
+                                        {% endif %}
                                     {% else %}
-                                        <button type="button" onclick="interceptWakeTrigger('{{ alias }}')" class="w-full pi-btn-emerald text-white font-extrabold py-3 px-4 rounded-xl text-xs tracking-wider uppercase transition duration-150 text-center shadow-lg flex items-center justify-center gap-2 block">
-                                            <i class="fa-solid fa-power-off"></i> Dispatch Wake Signal
-                                        </button>
+                                        <form action="/api/wake/{{ alias }}" method="post">
+                                            <button type="submit" class="w-full pi-btn-emerald text-white font-extrabold py-2.5 rounded-xl text-xs uppercase tracking-wide"><i class="fa-solid fa-power-off mr-1"></i> Dispatch Wake Signal</button>
+                                        </form>
                                     {% endif %}
                                 </div>
                             </div>
@@ -181,196 +181,36 @@
         </div>
     </div>
 
-    <div id="authModal" class="hidden fixed inset-0 bg-slate-950/80 backdrop-blur-md flex items-center justify-center p-4 z-50">
-        <div class="pi-panel border rounded-2xl max-w-md w-full p-6 relative shadow-2xl">
-            <button onclick="document.getElementById('authModal').classList.add('hidden')" class="absolute top-4 right-4 text-slate-500 hover:text-white transition"><i class="fa-solid fa-xmark text-lg"></i></button>
-            <div class="flex items-center gap-3 mb-4">
-                <div class="bg-blue-500/10 border border-blue-500/20 text-blue-400 p-2.5 rounded-xl"><i class="fa-solid fa-shield-halved text-lg"></i></div>
-                <h3 id="authModalTitle" class="text-lg font-black text-white">Authentication Required</h3>
-            </div>
-            <p id="authModalDesc" class="text-xs pi-text-muted leading-relaxed mb-5">Provide secure network administrative console credentials to authorize actions pipeline channels.</p>
-            <form id="authModalForm" method="post" class="space-y-4 m-0">
-                <div class="grid grid-cols-2 gap-4">
-                    <div>
-                        <label class="block text-[10px] font-black uppercase tracking-wider pi-text-muted mb-1.5">Console User</label>
-                        <input type="text" name="username" placeholder="e.g. Admin" class="w-full pi-dark border rounded-xl px-3 py-2.5 text-sm font-mono text-white focus:outline-none focus:border-blue-500" required>
-                    </div>
-                    <div>
-                        <label class="block text-[10px] font-black uppercase tracking-wider pi-text-muted mb-1.5">Console Password</label>
-                        <input type="password" name="password" placeholder="••••••••" class="w-full pi-dark border rounded-xl px-3 py-2.5 text-sm font-mono text-white focus:outline-none focus:border-blue-500" required>
-                    </div>
+    <div id="winSleepModal" class="hidden fixed inset-0 bg-slate-950/80 backdrop-blur-md flex items-center justify-center p-4 z-50">
+        <div class="pi-panel border rounded-2xl max-w-sm w-full p-6 relative shadow-2xl space-y-4">
+            <button onclick="closeWindowsSleepModal()" class="absolute top-4 right-4 text-slate-500"><i class="fa-solid fa-xmark"></i></button>
+            <h3 class="text-base font-black text-white"><i class="fa-brands fa-windows text-blue-400 mr-2"></i>Windows Target Auth</h3>
+            <form id="winSleepForm" method="post" class="space-y-4 m-0">
+                <div class="space-y-2">
+                    <input type="text" name="username" placeholder="Windows Target User" class="w-full pi-dark border rounded-xl px-3 py-2 text-white focus:outline-none text-xs" required>
+                    <input type="password" name="password" placeholder="Windows User Password" class="w-full pi-dark border rounded-xl px-3 py-2 text-white focus:outline-none text-xs" required>
                 </div>
-                <div class="pi-dark border rounded-xl p-4 space-y-2 mt-2 shadow-inner">
-                    <label class="flex items-start gap-3 cursor-pointer group">
-                        <input type="checkbox" name="remember" value="true" class="mt-1 rounded border-slate-700 bg-slate-900 text-blue-600 focus:ring-0 focus:ring-offset-0 transition">
-                        <span class="text-xs font-bold text-slate-400 group-hover:text-white transition">Remember credentials for this web session</span>
-                    </label>
-                </div>
-                <button type="submit" class="w-full pi-btn-blue text-white font-bold py-3.5 rounded-xl text-xs tracking-wider uppercase transition shadow-lg mt-2">Verify & Authorize Execution</button>
+                <button type="submit" class="w-full bg-blue-600 hover:bg-blue-700 text-white font-bold py-2.5 rounded-xl uppercase text-xs tracking-wider">Execute Sleep</button>
             </form>
         </div>
     </div>
+    {% endif %}
 
     <script>
-        const SESSION_ACTIVE = {{ 'true' if session_set else 'false' }};
-
-        // AJAX POST FORMS SUBMISSION MATRIX WITH DUPLICATE LAYER CHECKS
-        async function validateNodeForm(event) {
-            event.preventDefault();
-
-            const aliasInput = document.getElementById('form_alias_field');
-            const ipInput = document.getElementById('form_ip_field');
-            const macInput = document.getElementById('form_mac_field');
-            const osSelect = document.getElementById('form_os_select');
-            const sshInput = document.getElementById('modal_ssh_user');
-            const label = document.getElementById('lookupStatusLabel');
-            
-            const alias = aliasInput.value.trim();
-            const ip = ipInput.value.trim();
-            const mac = macInput.value.trim();
-
-            const ipRegex = /^(\d{1,3}\.){3}\d{1,3}$/;
-            const macRegex = /^([0-9A-Fa-f]{2}[:-]){5}([0-9A-Fa-f]{2})$/;
-
-            if (!alias) {
-                label.className = "text-[10px] text-rose-400 font-bold block mt-1.5";
-                label.innerHTML = "<i class='fa-solid fa-triangle-exclamation'></i> Missing input: Please provide a custom profile identifier.";
-                aliasInput.focus();
-                return;
-            }
-            if (!ip || !ipRegex.test(ip)) {
-                label.className = "text-[10px] text-rose-400 font-bold block mt-1.5";
-                label.innerHTML = "<i class='fa-solid fa-triangle-exclamation'></i> Invalid Syntax: Provide a valid local IPv4 address.";
-                ipInput.focus();
-                return;
-            }
-            if (!mac || !macRegex.test(mac)) {
-                label.className = "text-[10px] text-rose-400 font-bold block mt-1.5";
-                label.innerHTML = "<i class='fa-solid fa-triangle-exclamation'></i> Invalid Hardware Frame: Provide a full 12-digit MAC address.";
-                macInput.focus();
-                return;
-            }
-
-            label.className = "text-[10px] text-blue-400 block mt-1.5 font-medium";
-            label.innerHTML = "<i class='fa-solid fa-spinner fa-spin mr-1'></i> Verifying environment parameters...";
-
-            const formData = new FormData();
-            formData.append('alias', alias);
-            formData.append('ip', ip);
-            formData.append('mac', mac);
-            formData.append('os_type', osSelect.value);
-            formData.append('ssh_user', sshInput.value);
-
-            try {
-                const response = await fetch('/api/add', {
-                    method: 'POST',
-                    body: formData
-                });
-
-                if (response.ok) {
-                    label.className = "text-[10px] text-emerald-400 font-bold block mt-1.5";
-                    label.innerHTML = "<i class='fa-solid fa-circle-check'></i> Node committed to storage disk successfully!";
-                    setTimeout(() => { window.location.reload(); }, 800);
-                } else {
-                    const data = await response.json();
-                    label.className = "text-[10px] text-rose-400 font-bold block mt-1.5";
-                    label.innerHTML = `<i class='fa-solid fa-ban'></i> Conflict Detected: ${data.error}`;
-                }
-            } catch (err) {
-                label.className = "text-[10px] text-rose-500 block mt-1.5";
-                label.innerHTML = "<i class='fa-solid fa-wifi-slash'></i> Error connecting to backend verification database.";
-            }
+        function toggleDualBootInterface() {
+            const toggle = document.getElementById('dual_boot_toggle');
+            const container = document.getElementById('dual_boot_container');
+            if (toggle.checked) container.classList.remove('hidden');
+            else container.classList.add('hidden');
         }
-
-        async function triggerAutoMacLookup() {
-            const ipVal = document.getElementById('form_ip_field').value.trim();
-            const macInput = document.getElementById('form_mac_field');
-            const label = document.getElementById('lookupStatusLabel');
-
-            if (!ipVal) {
-                label.className = "text-[10px] text-rose-400 font-bold block mt-1.5";
-                label.innerHTML = "<i class='fa-solid fa-triangle-exclamation'></i> Provide an IP address before running detection.";
-                return;
-            }
-
-            label.className = "text-[10px] text-amber-400 font-medium block mt-1.5 animate-pulse";
-            label.innerHTML = "<i class='fa-solid fa-spinner fa-spin mr-1'></i> Refreshing routing cache...";
-
-            try {
-                const response = await fetch(`/api/lookup/${ipVal}`);
-                const data = await response.json();
-
-                if (data.success) {
-                    macInput.value = data.mac;
-                    label.className = "text-[10px] text-emerald-400 font-bold block mt-1.5";
-                    label.innerHTML = "<i class='fa-solid fa-check-circle'></i> Target resolved and mapped successfully!";
-                } else {
-                    label.className = "text-[10px] text-rose-400 block mt-1.5";
-                    label.innerHTML = `<i class='fa-solid fa-triangle-exclamation'></i> Passive lookup failed. Ensure target machine is active.`;
-                }
-            } catch (err) {
-                label.className = "text-[10px] text-rose-500 block mt-1.5";
-                label.innerHTML = "Error connecting to backend lookup engine wrapper API.";
-            }
+        function openWindowsSleepModal(alias) {
+            const modal = document.getElementById('winSleepModal');
+            const form = document.getElementById('winSleepForm');
+            form.action = '/api/sleep/' + alias;
+            modal.classList.remove('hidden');
         }
-
-        function toggleSSHUserField(val) {
-            const container = document.getElementById('sshUserFieldContainer');
-            const input = document.getElementById('modal_ssh_user');
-            if (val === 'linux') {
-                container.classList.remove('pointer-events-none');
-                container.classList.remove('opacity-40');
-                input.required = true;
-                input.value = 'root';
-            } else {
-                container.classList.add('pointer-events-none');
-                container.classList.add('opacity-40');
-                input.required = false;
-                input.value = '';
-            }
-        }
-
-        function interceptWakeTrigger(alias) {
-            if (SESSION_ACTIVE) {
-                const form = document.createElement('form');
-                form.method = 'POST';
-                form.action = `/api/wake/${alias}`;
-                document.body.appendChild(form);
-                form.submit();
-            } else {
-                document.getElementById('authModalTitle').innerText = "Wake Authorization Required";
-                document.getElementById('authModalDesc').innerText = "To dispatch a Layer-2 Magic Packet wake broadcast request, authorize console administrative rights.";
-                const formElement = document.getElementById('authModalForm');
-                formElement.action = `/api/wake/${alias}`;
-                document.getElementById('authModal').classList.remove('hidden');
-            }
-        }
-
-        function interceptSleepTrigger(alias, os_type) {
-            if (os_type === 'linux' || SESSION_ACTIVE) {
-                const card = document.querySelector(`[data-alias="${alias}"]`);
-                if (card) {
-                    const dot = card.querySelector('.rounded-full');
-                    const text = card.querySelector('.text-emerald-400');
-                    if (dot) dot.className = "h-2.5 w-2.5 rounded-full bg-[#f04444]";
-                    if (text) {
-                        text.className = "text-[11px] font-black uppercase tracking-widest text-[#f04444]";
-                        text.innerText = "Offline Profile";
-                    }
-                }
-                
-                const form = document.createElement('form');
-                form.method = 'POST';
-                form.action = `/api/sleep/${alias}`;
-                document.body.appendChild(form);
-                form.submit();
-            } else {
-                document.getElementById('authModalTitle').innerText = "Sleep Action Authentication";
-                document.getElementById('authModalDesc').innerText = "To suspend this workstation remotely, your Raspberry Pi must verify secure remoting network contexts.";
-                const formElement = document.getElementById('authModalForm');
-                formElement.action = `/api/sleep/${alias}`;
-                document.getElementById('authModal').classList.remove('hidden');
-            }
+        function closeWindowsSleepModal() {
+            document.getElementById('winSleepModal').classList.add('hidden');
         }
     </script>
 </body>
